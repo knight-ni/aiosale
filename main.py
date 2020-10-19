@@ -1,21 +1,15 @@
-#pip install lxml
-#pip install html5lib
-#pip install xlwt
-#pip install openpyxl
+# pip install lxml
+# pip install html5lib
+# pip install xlwt
+# pip install openpyxl
 import calendar
 from datetime import datetime, date
-import gevent
-from gevent.pool import Pool
-from gevent import monkey
-monkey.patch_all()
 import aiohttp
 import pandas as pd
 from bs4 import BeautifulSoup
 import asyncio
 from enum import Enum
 import sys
-
-
 
 host = '172.30.10.200'
 origin = 'http://{}'.format(host)
@@ -29,6 +23,8 @@ indicators = ['Total Stakes (RMB)', 'Num Tickets']
 pd.set_option('display.max_columns', None)
 pd.set_option('display.max_rows', None)
 pd.set_option('max_colwidth', 100)
+
+
 # header = {
 #     "Accept-Encoding": "gzip, deflate",
 #     "Accept-Language": "zh-CN,zh;q=0.9",
@@ -90,9 +86,9 @@ async def getdata(client, start_date, end_date, interval):
             htmldoc = await resp1.text()
             datasoup = BeautifulSoup(htmldoc, features="html.parser")
             datatab = datasoup.find_all(attrs={'class': 'data'})
-            if(len(datatab)>0):
+            if (len(datatab) > 0):
                 df = pd.read_html(str(datatab[1]), index_col='Indicator')[0]
-                #order_detail = ['START', 'STOP', 'CS/SGL', 'CS/DBL', 'CS/TBL', 'CS/ACC4', 'CS', 'WDW/DBL', 'WDW/TBL', 'WDW/ACC4', 'WDW', 'TG/DBL', 'TG/TBL', 'TG/ACC4', 'TG', 'HF/DBL', 'HF/TBL', 'HF/ACC4', 'HF', 'Total']
+                # order_detail = ['START', 'STOP', 'CS/SGL', 'CS/DBL', 'CS/TBL', 'CS/ACC4', 'CS', 'WDW/DBL', 'WDW/TBL', 'WDW/ACC4', 'WDW', 'TG/DBL', 'TG/TBL', 'TG/ACC4', 'TG', 'HF/DBL', 'HF/TBL', 'HF/ACC4', 'HF', 'Total']
                 order = ['CS', 'WDW', 'TG', 'HF', 'Total']
 
                 df['CS'] = df.apply(lambda x: x['CS/SGL'] + x['CS/DBL'] + x['CS/TBL'] + x['CS/ACC4'], axis=1)
@@ -102,7 +98,7 @@ async def getdata(client, start_date, end_date, interval):
                 df1 = df[order]
 
                 df2 = pd.read_html(str(datatab[2]), index_col='Indicator')[0]
-                df2['CS'] = df2.apply(lambda x : x['CS'], axis=1)
+                df2['CS'] = df2.apply(lambda x: x['CS'], axis=1)
                 df2['WDW'] = df2.apply(lambda x: x['WDW'], axis=1)
                 df2['TG'] = df2.apply(lambda x: x['TG'], axis=1)
                 df2['HF'] = df2.apply(lambda x: x['HF'], axis=1)
@@ -123,6 +119,7 @@ async def getdata(client, start_date, end_date, interval):
             else:
                 return None
 
+
 async def cal_month_day(dtstr):
     year, month = dtstr.split('-')
     firstDayWeekDay, monthRange = calendar.monthrange(int(year), int(month))
@@ -131,10 +128,13 @@ async def cal_month_day(dtstr):
     lastday = '{} 23:59:59'.format(lastDay)
     return [firstday, lastday]
 
-def get_month_range(startmon ,endmon):
-    months = (endmon.year - startmon.year)*12 + endmon.month - startmon.month
-    month_range = ['%s-%s' % (startmon.year + mon//12, mon % 12+1) for mon in range(startmon.month-1, startmon.month+months)]
+
+def get_month_range(startmon, endmon):
+    months = (endmon.year - startmon.year) * 12 + endmon.month - startmon.month
+    month_range = ['%s-%s' % (startmon.year + mon // 12, mon % 12 + 1) for mon in
+                   range(startmon.month - 1, startmon.month + months)]
     return month_range
+
 
 async def main(sdtstr, edtstr):
     interval = unit.month.value
@@ -147,14 +147,10 @@ async def main(sdtstr, edtstr):
             start, end = await cal_month_day(mon)
             tasks.append(asyncio.create_task(getdata(client, start, end, interval)))
         tasks = await asyncio.gather(*tasks)
-        frames = [ f for f in tasks if not f is None ]
+        frames = [f for f in tasks if not f is None]
         alldata = pd.concat(frames)
-        alldata.to_excel('test.xlsx',index=None)
+        alldata.to_excel('test.xlsx', index=None)
+
 
 loop = asyncio.get_event_loop()
 loop.run_until_complete(main('2013-01-01', '2020-10-01'))
-
-
-
-
-
