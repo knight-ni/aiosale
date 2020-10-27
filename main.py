@@ -4,7 +4,6 @@ from configparser import ConfigParser
 
 import aiohttp
 import pandas as pd
-from styleframe import StyleFrame, Styler, utils
 
 import aioclient
 import eventHandler
@@ -23,7 +22,6 @@ cp.read(path)
 cp = cp[mytype]
 ac = aioclient.AioClient(cp)
 threads = 5
-conn = aiohttp.TCPConnector(limit=int(threads))
 
 
 async def sample_for_summary(tasks=None):
@@ -33,6 +31,7 @@ async def sample_for_summary(tasks=None):
     number = 1
     localunit = unit.day.value
     cookie = await ac.getcookie()
+    conn = aiohttp.TCPConnector(limit=int(threads))
     async with aiohttp.ClientSession(connector=conn, cookies=cookie) as client:
         tasks.append(asyncio.create_task(
             getSummaryData.getdata(client=client, cp=cp, sdtstr=starttime, interval=number, unitname=localunit, )))
@@ -51,6 +50,7 @@ async def sample_for_transaction(tasks=None):
     loc_id = ''
     localunit = unit.day.value
     cookie = await ac.getcookie()
+    conn = aiohttp.TCPConnector(limit=int(threads))
     async with aiohttp.ClientSession(connector=conn, cookies=cookie) as client:
         tasks.append(asyncio.create_task(
             getTransactionData.getdata(client=client, cp=cp, sdtstr=starttime, edtstr=stoptime, siteno=siteno,
@@ -71,6 +71,7 @@ async def sample_for_event(tasks=None):
     bet_type = 'any'
     breakdown = unit.month.value
     cookie = await ac.getcookie()
+    conn = aiohttp.TCPConnector(limit=int(threads))
     async with aiohttp.ClientSession(connector=conn, cookies=cookie) as client:
         tasks.append(asyncio.create_task(getEventData.getdata(client=client, cp=cp, sdtstr=starttime, edtstr=stoptime,
                                                               event_start_time=event_start_time, draw_id=draw_id,
@@ -93,6 +94,7 @@ async def sample_for_months_eventhandle(tasks=None):
     bet_type = 'any'
     breakdown = unit.month.value
     cookie = await ac.getcookie()
+    conn = aiohttp.TCPConnector(limit=int(threads))
     async with aiohttp.ClientSession(connector=conn, cookies=cookie) as client:
         for month in monthlst:
             starttime, stoptime = await month_calc.cal_month_day(month)
@@ -104,7 +106,7 @@ async def sample_for_months_eventhandle(tasks=None):
         tasks = await asyncio.gather(*tasks)
         frames = [f for f in tasks if f is not None]
         alldata = pd.concat(frames)
-        alldata.to_excel('test.xlsx', index=None)
+        alldata.to_excel('test.xlsx', index=False)
         # excel_writer = StyleFrame.ExcelWriter('test.xlsx')
         # sf = StyleFrame(alldata)
         # sf.apply_column_style(cols_to_style=alldata.columns.values.tolist(), styler_obj=Styler(number_format=utils.number_formats.general_float,horizontal_alignment=utils.horizontal_alignments.center, vertical_alignment=utils.vertical_alignments.center,wrap_text=True,shrink_to_fit=True, fill_pattern_type=utils.fill_pattern_types.solid, indent=0, comment_author=None, comment_text=None, text_rotation=0))
@@ -124,6 +126,7 @@ async def sample_for_days_summary(tasks=None):
     number = 1
     localunit = unit.day.value
     cookie = await ac.getcookie()
+    conn = aiohttp.TCPConnector(limit=int(threads))
     async with aiohttp.ClientSession(connector=conn, cookies=cookie) as client:
         for day in daylst:
             tasks.append(asyncio.create_task(
@@ -131,7 +134,7 @@ async def sample_for_days_summary(tasks=None):
         tasks = await asyncio.gather(*tasks)
         frames = [f for f in tasks if f is not None]
         alldata = pd.concat(frames)
-        alldata.to_excel('test.xlsx', index=None)
+        alldata.to_excel('test.xlsx', index=False)
         # excel_writer = StyleFrame.ExcelWriter('test.xlsx')
         # sf = StyleFrame(alldata)
         # sf.apply_column_style(cols_to_style=alldata.columns.values.tolist(), styler_obj=Styler(number_format="2"), style_header=False, use_default_formats=True, width=None,
@@ -142,4 +145,4 @@ async def sample_for_days_summary(tasks=None):
 
 loop = asyncio.get_event_loop()
 #loop.run_until_complete(sample_for_event())
-loop.run_until_complete(sample_for_months_eventhandle())
+loop.run_until_complete(sample_for_days_summary())
