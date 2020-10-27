@@ -6,8 +6,10 @@ async def cal_month_day(dtstr):
     year, month = dtstr.split('-')
     firstweekday, monthrange = calendar.monthrange(int(year), int(month))
     lastday = date(year=int(year), month=int(month), day=monthrange)
-    firstday = '{}-{:0>2s}-{:0>2s} 00:00:00'.format(year, month, '1')
-    lastday = '{} 23:59:59'.format(lastday)
+    firstday = '{}-{:0>2s}-{:0>2s}'.format(year, month, '1')
+    if firstday=='2013-11-01':
+        firstday='2013-11-28'
+    lastday = '{}'.format(lastday)
     return [firstday, lastday]
 
 
