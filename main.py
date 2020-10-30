@@ -1,6 +1,9 @@
 import asyncio
 import os
 from configparser import ConfigParser
+#not work on Windows
+#import uvloop
+#asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 
 import aiohttp
 import pandas as pd
@@ -143,6 +146,7 @@ async def sample_for_days_summary(tasks=None):
         # excel_writer.save()
 
 
-loop = asyncio.get_event_loop()
-#loop.run_until_complete(sample_for_event())
-loop.run_until_complete(sample_for_days_summary())
+# loop = asyncio.get_event_loop()
+# #loop.run_until_complete(sample_for_event())
+# loop.run_until_complete(sample_for_days_summary())
+asyncio.run(sample_for_days_summary())
