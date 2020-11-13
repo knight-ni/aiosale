@@ -1,13 +1,15 @@
 import asyncio
 import os
+import time
 from configparser import ConfigParser
-#not work on Windows
-#import uvloop
-#asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-
+#not work on Windows Begin
+import uvloop
+asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+#not work on Windows End
 import aiohttp
 import pandas as pd
-
+import DingTalker
+import datetime
 import aioclient
 import eventHandler
 import summaryHandler
@@ -19,7 +21,7 @@ import day_calc
 from Classes.myclass import *
 
 mytype = 'report'
-path = os.path.split(os.path.realpath(__file__))[0] + r'\Conf\client.cfg'
+path = os.path.split(os.path.realpath(__file__))[0] + r'/Conf/client.cfg'
 cp = ConfigParser()
 cp.read(path)
 cp = cp[mytype]
@@ -30,17 +32,45 @@ threads = 5
 async def sample_for_summary(tasks=None):
     if tasks is None:
         tasks = []
-    starttime = '2014-04-01'
+    today = datetime.datetime.today()
+    yesday = today - datetime.timedelta(days=1)
+    year = yesday.year
+    month = yesday.month
+    day = yesday.day
+    newday = '%04d-%02d-%02d'%(year, month, day)
     number = 1
     localunit = unit.day.value
+    indicators = ['Period Start', 'Period End', 'Payout (RMB)']
     cookie = await ac.getcookie()
     conn = aiohttp.TCPConnector(limit=int(threads))
     async with aiohttp.ClientSession(connector=conn, cookies=cookie) as client:
         tasks.append(asyncio.create_task(
-            getSummaryData.getdata(client=client, cp=cp, sdtstr=starttime, interval=number, unitname=localunit, )))
+                            summaryHandler.datahandle(client, cp, newday, number, localunit, indicators)))
         tasks = await asyncio.gather(*tasks)
         frames = [f for f in tasks if f is not None]
-        print(frames)
+        return frames
+
+
+async def sample_for_summary_payout(days,tasks=None):
+    if tasks is None:
+        tasks = []
+    today = datetime.datetime.today()
+    yesday = today - datetime.timedelta(days=days)
+    year = yesday.year
+    month = yesday.month
+    day = yesday.day
+    newday = '%04d-%02d-%02d'%(year, month, day)
+    number = days 
+    localunit = unit.day.value
+    indicators = ['Period Start', 'Period End', 'Winnings (RMB)', 'Collected Winnings (RMB)']
+    cookie = await ac.getcookie()
+    conn = aiohttp.TCPConnector(limit=int(threads))
+    async with aiohttp.ClientSession(connector=conn, cookies=cookie) as client:
+        tasks.append(asyncio.create_task(
+                            summaryHandler.datahandle(client, cp, newday, number, localunit, indicators)))
+        tasks = await asyncio.gather(*tasks)
+        frames = [f for f in tasks if f is not None]
+        return frames
 
 
 async def sample_for_transaction(tasks=None):
@@ -60,7 +90,7 @@ async def sample_for_transaction(tasks=None):
                                        area_id=area_id, loc_id=loc_id, localunit=localunit)))
         tasks = await asyncio.gather(*tasks)
         frames = [f for f in tasks if f is not None]
-        print(frames)
+        return frames
 
 
 async def sample_for_event(tasks=None):
@@ -82,7 +112,7 @@ async def sample_for_event(tasks=None):
                                                               breakdown=breakdown)))
         tasks = await asyncio.gather(*tasks)
         frames = [f for f in tasks if f is not None]
-        print(frames)
+        return frames
 
 
 async def sample_for_months_eventhandle(tasks=None):
@@ -125,7 +155,7 @@ async def sample_for_days_summary(tasks=None):
     if tasks is None:
         tasks = []
     daylst = await day_calc.get_date_list(startdt, stopdt)
-    indicators = ['Period Start', 'Period End', 'Turnover (RMB)', 'Winnings (RMB)']
+    indicators = ['Period Start', 'Period End', 'Payout (RMB)']
     number = 1
     localunit = unit.day.value
     cookie = await ac.getcookie()
@@ -145,8 +175,49 @@ async def sample_for_days_summary(tasks=None):
         # sf.to_excel(excel_writer=excel_writer, row_to_add_filters=0, index=True)
         # excel_writer.save()
 
+async def main(retry):
+    tasks = []
+    tasks.append(asyncio.create_task(sample_for_summary()))
+    tasks.append(asyncio.create_task(sample_for_summary_payout(60)))
+    taskres = await asyncio.gather(*tasks)
+    frames = [f for f in taskres if f is not None]
+    while (len(frames[0])<1 or len(frames[1])<1):
+        print("retrying")
+        time.sleep(2)
+        tasks = []
+        tasks.append(asyncio.create_task(sample_for_summary()))
+        tasks.append(asyncio.create_task(sample_for_summary_payout(60)))
+        taskres = await asyncio.gather(*tasks)
+        retry-=1
+        frames = [f for f in taskres if f is not None]
+        if (retry==0):
+            break
+    return frames
 
-# loop = asyncio.get_event_loop()
+
 # #loop.run_until_complete(sample_for_event())
 # loop.run_until_complete(sample_for_days_summary())
-asyncio.run(sample_for_days_summary())
+fes = asyncio.run(main(5))
+tab1 = fes[0][0].loc[[0],['Period Start 1','Payout (RMB) 1']]
+dt = tab1.iloc[:,0].iloc[0]
+year, month, day = dt.split(' ')[0].split('-')
+payout = tab1.loc[[0],['Payout (RMB) 1']].iloc[0,-1]
+tab2 = fes[1][0].loc[[0],['Period Start 1','Winnings (RMB) 1','Collected Winnings (RMB) 1']]
+dt1 = tab2.iloc[:,0].iloc[0]
+winning = tab2.iloc[:,1].iloc[0]
+collect = tab2.iloc[:,2].iloc[0]
+money = round((float(winning) - float(collect))/10000,1)
+print('昨日日期:%s\n兑奖金额%s\n60天前日期%s\n中奖奖金%s\n已兑奖金%s\n未兑奖金%s\n'%(dt,payout,dt1,winning,collect,money))
+txt = 'e球彩%s月%s日当日全省兑奖金额为%s元; 60天有效兑奖期内未兑奖总额%s万元'%(month, day, payout, money)
+dt = DingTalker.DingTalker().sendMsg2(txt)
+
+'''
+for f in fes:
+    txt = f.loc[[0],['Period Start 1','Payout (RMB) 1']]
+    dt = txt.iloc[:,0].iloc[0]
+    year, month, day = dt.split(' ')[0].split('-')
+    payout = txt.iloc[:,1].iloc[0]
+    txt = '%s月%s日,全省兑奖金额为%s元'%(month, day, payout)
+    dt = DingTalker.DingTalker().sendMsg2(txt)
+dt = DingTalker.DingTalker().sendMsg2()
+'''
